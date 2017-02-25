@@ -12,7 +12,7 @@
 \usepackage{textcomp}
 \usepackage[top=1in,bottom=1in, left=1in, right=1in]{geometry}
 \usepackage[hidelinks]{hyperref}
-
+\usepackage{subcaption}
 \usepackage{listings}
 \usepackage{xcolor}
 \lstset{
@@ -98,19 +98,19 @@ TK1支持许多常见的Machine Learning、Computer Vision框架。详细列表�
 进入安装目录
 {\setmainfont{Courier New Bold}                          % 设置代码字体
 \begin{lstlisting}[language=bash]
-ubuntu@tegra-ubuntu:~\$ cd NVIDIA-INSTALLER
+cd NVIDIA-INSTALLER
 \end{lstlisting}}
 运行安装脚本
 {\setmainfont{Courier New Bold}                          % 设置代码字体
 \begin{lstlisting}[language=bash]
-ubuntu@tegra-ubuntu:~\$ sudo ./installer.sh
+sudo ./installer.sh
 \end{lstlisting}}
 按提示输入密码，都是\warn{ubuntu}
 
 安装完成之后，重启机器
 {\setmainfont{Courier New Bold}                          % 设置代码字体
 \begin{lstlisting}[language=bash]
-ubuntu@tegra-ubuntu:~\$ sudo reboot
+sudo reboot
 \end{lstlisting}}
 
 至此，开箱的第一步工作已经完成，可以看到，现在已经可以进入Ubuntu系统了。
@@ -126,7 +126,136 @@ ubuntu@tegra-ubuntu:~\$ sudo reboot
 
 
 \chapter{CUDA的安装}
+\section{下载并安装CUDA包}
+Jetson TK1支持NVIDIA CUDA，不过暂时仍旧只对低版本支持较好，高版本的支持情况可以等待本文档的后续更新。
+下载安装包：\url{https://developer.nvidia.com/cuda-toolkit-60}
+如图所示，应该选择对应的CUDA版本，由于TK的出厂时间较早，支持的比较好的版本是6.0，而且要选择\warn{Linux for Tegra}这个版本。
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=5.5in]{4.png}
+  \caption{CUDA6release界面}
+\end{figure}
+
+下载后可以见到deb包
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+ls
+cuda-repo-l4t-r19.2_6.0-42_armhf.deb
+\end{lstlisting}}
+
+安装deb包
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+sudo apt-get update
+sudo dpkg -i xxx.deb
+\end{lstlisting}}
+
+安装samples和toolkit
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+sudo apt-get install cuda-samples-6-0
+sudo apt-get install cuda-toolkit-6-0
+\end{lstlisting}}
+
+设置当前用户下可以访问GPU
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+sudo usermod -a -G video ubuntu
+\end{lstlisting}}
+
+\warn{修改环境变量}
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+vim ~/.bashrc
+\end{lstlisting}}
+
+在后面加上
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+# Add CUDA bin and lib path
+export PATH=/usr/local/cuda-6.0/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/cuda-6.0/lib:$LD_LIBRARY_PATH
+\end{lstlisting}}
+
+更新bashrc
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+source .bashrc
+\end{lstlisting}}
+
+检查是否安装正常
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+nvcc -V
+\end{lstlisting}}
+如图所示即为安装完成。
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=4in]{5.png}
+  \caption{CUDA安装完成}
+\end{figure}
+
+\pagebreak
+\section{编译与运行例程}
+进入cuda目录并查看当前目录中是否有samples
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+cd /usr/local/cuda
+ls
+\end{lstlisting}}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=6in]{6.png}
+  \caption{目录文件}
+\end{figure}
+将samples拷贝到所需要的目录
+\info{cuda-install-samples-6.0.sh}是bin下面的文件，应该已经添加到PATH环境变量，不需要绝对路径即可运行，如果不能运行，请检查是否添加了环境变量。
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+cuda-install-samples-6.0.sh /home/ubuntu/
+\end{lstlisting}}
+回到主目录下查看
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+cd
+ls
+\end{lstlisting}}
+如果有名为
+\info{NVIDIA\_CUDA-6.0\_Samples}
+的文件夹拷贝samples就完成了。
+下面我们编译CUDA的samples
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+cd NVIDIA_CUDA-6.0_Samples
+make
+\end{lstlisting}}
+编译完成之后我们可以在
+{\setmainfont{Courier New Bold} ./bin/armv7l/linux/release/gnueabihf}
+找到编译好的文件
+
+一下是运行某些例程的截图，可以自行探索。
+
+\begin{figure*}[h]
+    \centering
+        \begin{subfigure}[h!]{0.5\textwidth}
+            \centering
+            \includegraphics[height=5cm]{8.png}
+            \caption{sample截图1}
+        \end{subfigure}%
+        ~
+        \begin{subfigure}[h!]{0.5\textwidth}
+            \centering
+            \includegraphics[height=5cm]{9.png}
+            \caption{sample截图2}
+        \end{subfigure}
+        \caption{例程截图}
+\end{figure*}
+
+\pagebreak
 \chapter{安装OpenCV}
+\section{OpenCV下载}
+
 \chapter{YOLO Draknet编译}
 
 
