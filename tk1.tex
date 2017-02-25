@@ -1,0 +1,133 @@
+% Encoding: UTF8
+% \documentclass{ctexart}
+
+\documentclass[openany]{ctexbook}
+\usepackage{graphicx}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[mathscr]{eucal}
+\usepackage{pythonhighlight}
+\usepackage{fancyhdr}
+\usepackage{textcomp}
+\usepackage[top=1in,bottom=1in, left=1in, right=1in]{geometry}
+\usepackage[hidelinks]{hyperref}
+
+\usepackage{listings}
+\usepackage{xcolor}
+\lstset{
+    columns=fixed,
+    numbers=left,                                        % 在左侧显示行号
+    frame=none,                                          % 不显示背景边框
+    backgroundcolor=\color[RGB]{245,245,244},            % 设定背景颜色
+    keywordstyle=\color[RGB]{40,40,255},                 % 设定关键字颜色
+    numberstyle=\footnotesize\color{darkgray},           % 设定行号格式
+    commentstyle=\it\color[RGB]{0,96,96},                % 设置代码注释的格式
+    stringstyle=\rmfamily\slshape\color[RGB]{128,0,0},   % 设置字符串格式
+    showstringspaces=false,                                       % 设置语言
+}
+
+\newcommand{\warn}[1] {\fcolorbox{red!20}{red!20} {\color{red} #1}}
+\newcommand{\info}[1] {\fcolorbox{blue!20}{blue!20} {\color{blue} #1}}
+
+
+\begin{document}
+
+\begin{titlepage}
+  \pagenumbering{roman}
+  \title{NVIDIA Jetson TK1使用介绍文档}
+  \author{闻超\\v0.1.0}
+  \date{\today}
+  \maketitle
+  \setcounter{page}{1}
+  \tableofcontents
+\end{titlepage}
+
+\pagenumbering{arabic}
+\chapter{NVIDIA Jetson TK1介绍}
+\section{硬件参数介绍}
+\paragraph{尺寸}
+127mm x 127mm
+\paragraph{TK1 SOC}
+CPU+GPU+ISP一体设计
+\paragraph{GPU}
+NVIDIA Kepler ``GK20a'' GPU with 192 SM3.2 CUDA cores (upto 326 GFLOPS)
+\paragraph{CPU}
+NVIDIA 2.32GHz ARM quad-core Cortex-A15 CPU
+\paragraph{DRAM}
+2GB DDR3L 933MHz EMC x16 使用 64-bit 数据位宽
+\paragraph{存储}
+16GB fast eMMC 4.51
+\paragraph{mini-PCIe}
+此接口可用于SSD、WiFi、以太网的扩展
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=5.5in]{1.jpg}
+  \caption{TK1硬件组件介绍}
+\end{figure}
+
+\section{入门资料汇总}
+对于第一次使用TK1的童鞋们，可以仔细阅读以下网址提供的资料：\url{http://elinux.org/Jetson_TK1}
+
+TK1开发板的一些资料下载网址：\url{https://developer.nvidia.com/jetson-tk1}
+
+入门视频教学：\url{http://www.iqiyi.com/a_19rrhc0aql.html}
+
+\section{接口相关注意事项}
+\begin{enumerate}
+  \item Jetson TK1只提供一个USB接口，因此若想连接鼠标、键盘等外设，可以自己购买一个USB-HUB来使用
+  \item Jetson TK1提供的显示接口是HDMI，如果没有HDMI接口显示器，可以买一个HDMI转VGA或者DVI接口线即可
+\end{enumerate}
+
+\section{Jetson TK1 支持的实验框架}
+TK1支持许多常见的Machine Learning、Computer Vision框架。详细列表可见\url{http://elinux.org/Jetson_TK1#Tutorials_for_developing_with_Jetson_TK1}
+同时，近些年深度学习多种框架出现，TK1也在不同程度上支持这些框架，这些在上面的网址中可能没有详细说明，具体请见本文档后续的内容。
+
+
+\chapter{开箱与GUI系统安装}
+\section{开箱使用}
+首先，连接好电源和显示器、鼠标等外设之后，按电源键进入命令行界面进行带GUI的系统的安装过程。
+也就是Linux的Ubuntu发行版。可以看到，屏幕上有相关提示：
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=5.5in]{2.jpg}
+  \caption{第一次使用时的命令行界面}
+\end{figure}
+
+进入安装目录
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+ubuntu@tegra-ubuntu:~\$ cd NVIDIA-INSTALLER
+\end{lstlisting}}
+运行安装脚本
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+ubuntu@tegra-ubuntu:~\$ sudo ./installer.sh
+\end{lstlisting}}
+按提示输入密码，都是\warn{ubuntu}
+
+安装完成之后，重启机器
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+ubuntu@tegra-ubuntu:~\$ sudo reboot
+\end{lstlisting}}
+
+至此，开箱的第一步工作已经完成，可以看到，现在已经可以进入Ubuntu系统了。
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=5.5in]{3.jpg}
+  \caption{Ubuntu系统桌面}
+\end{figure}
+
+\section{配置远程连接}
+暂未完成
+
+
+
+\chapter{CUDA的安装}
+\chapter{安装OpenCV}
+\chapter{YOLO Draknet编译}
+
+
+\end{document}

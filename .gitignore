@@ -1,6 +1,7 @@
 # Temporary files
 *.jpg
 *.png
+*.pdf
 
 ## Core latex/pdflatex auxiliary files:
 *.aux
