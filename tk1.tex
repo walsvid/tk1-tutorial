@@ -15,6 +15,12 @@
 \usepackage{subcaption}
 \usepackage{listings}
 \usepackage{xcolor}
+\hypersetup{
+    colorlinks,
+    linkcolor={red!50!black},
+    citecolor={blue!50!black},
+    urlcolor={blue!80!black}
+}
 \lstset{
     columns=fixed,
     numbers=left,                                        % 在左侧显示行号
@@ -240,23 +246,203 @@ make
     \centering
         \begin{subfigure}[h!]{0.5\textwidth}
             \centering
-            \includegraphics[height=5cm]{8.png}
+            \includegraphics[height=1.8in]{8.png}
             \caption{sample截图1}
         \end{subfigure}%
         ~
         \begin{subfigure}[h!]{0.5\textwidth}
             \centering
-            \includegraphics[height=5cm]{9.png}
+            \includegraphics[height=1.8in]{9.png}
             \caption{sample截图2}
         \end{subfigure}
         \caption{例程截图}
 \end{figure*}
 
-\pagebreak
 \chapter{安装OpenCV}
 \section{OpenCV下载}
+首先注册NVIDIA的开发者账号\url{https://developer.nvidia.com}
+
+下载OpenCV，下载地址：\url{https://developer.nvidia.com/linux-tegra-rel-19}
+
+选择如下两个安装包，下载
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=6in]{10.png}
+  \caption{OpenCV TK1所需优化包}
+\end{figure}
+
+下载OpenCV源码，此处下载的版本虽然不是2.4.8但是仍可以编译通过，建议尽量选择与之匹配的版本，2.4.9即可。
+直接从下面的网址下载即可，如果速度较慢建议通过带有VPN的机器下载完成后拷贝到TK1中。
+
+可以点此下载：
+\href{http://downloads.sourceforge.net/project/opencvlibrary/opencv-unix/2.4.9/opencv-2.4.9.zip}{OpenCV2.4.9下载}
+
+也可以选择如下的命令行方式：
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+wget http://downloads.sourceforge.net/project/opencvlibrary/\
+opencv-unix/2.4.9/opencv-2.4.9.zip
+\end{lstlisting}}
+
+完成后可以看到如下的文件，表明下载完成
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+libopencv4tegra_2.4.8.2_armhf.deb
+libopencv4tegra-dev_2.4.8.2_armhf.deb
+opencv-2.4.9.zip
+\end{lstlisting}}
+
+\section{安装OpenCV依赖}
+首先更新源，并且安装OpenCV的若干依赖库。需要注意的是，这些库并非必须，全部安装可以支持较多格式，请根据需要进行安装。
+必须安装的用MUST标出。
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+sudo apt-get update
+# MUST Some general development libraries
+sudo apt-get install build-essential -y
+sudo apt-get install make cmake cmake-curses-gui g++ git  -y
+# MUST Required libraries
+sudo apt-get install libgtk2.0-dev pkg-config -y
+sudo apt-get libavcodec-dev libavformat-dev libswscale-dev  -y
+# Python libraries
+sudo apt-get install python-dev python-numpy -y
+# Other dependent libraries
+sudo apt-get libavutil-dev libv4l-dev libeigen3-dev -y
+sudo apt-get libglew1.6-dev libtbb2 libtbb-dev libjpeg-dev -y
+sudo apt-get libpng-dev libtiff-dev libjasper-dev libdc1394-22-dev -y
+\end{lstlisting}}
+
+接下来安装之前下载的两个deb包
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+sudo dpkg -i libopencv4tegra_2.4.8.2_armhf.deb
+sudo dpkg -i libopencv4tegra-dev_2.4.8.2_armhf.deb
+\end{lstlisting}}
+
+\section{源码编译OpenCV}
+首先解压缩OpenCV的源代码，然后建立编译需要的build目录。
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+unzip opencv-2.4.9.zip
+cd ~/opencv-2.4.9
+mkdir build
+cd build
+\end{lstlisting}}
+接下来我们可以查看cmake的编译选项：
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+ccmake ..
+\end{lstlisting}}
+需要注意的是，查看是否有CUDA支持，是否有Python支持。
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=5.5in]{11.png}
+  \caption{ccmake编译选项的可视化显示}
+\end{figure}
+
+编译并安装OpenCV
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+sudo make -j4
+sudo make install
+\end{lstlisting}}
+
+若能如图所示，表示OpenCV的Python支持安装成功。
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=5.5in]{12.png}
+  \caption{Python显示OpenCV版本}
+\end{figure}
+
+如果想测试GPU支持，可以到如下目录运行samples
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+cd ~/opencv-2.4.9/samples/gpu
+./hog --video 768x576.avi
+\end{lstlisting}}
+
+至此，OpenCV安装成功！
 
 \chapter{YOLO Draknet编译}
+\section{编译安装Darknet}
+首先拉取repo，然后进行编译
 
+\warn{此处的编译仅针对CPU版本，支持CUDA的GPU编译方式注意下一小节内容}
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+git clone https://github.com/pjreddie/darknet.git
+cd darknet
+make
+\end{lstlisting}}
+等待编译完成之后尝试运行
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+./darknet
+\end{lstlisting}}
+应该得到如下的输出
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+usage: ./darknet <function>
+\end{lstlisting}}
+至此，YOLO Darknet编译安装完成。
+\section{支持CUDA的编译}
+尽管YOLO Darknet已经有较快的物体检测速度，但是使用GPU可以得到数十倍甚至近百倍的速度加成，下面介绍如何在编译时支持CUDA。
+需要修改Makefile文件，有以下几点需要注意。
+
+将原来的Makefile
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=make]
+GPU=0
+...
+OPENCV=0
+...
+ARCH= -gencode arch=compute_20,code=[sm_20,sm_21] \
+      -gencode arch=compute_30,code=sm_30 \
+      -gencode arch=compute_35,code=sm_35 \
+      -gencode arch=compute_50,code=[sm_50,compute_50] \
+      -gencode arch=compute_52,code=[sm_52,compute_52]
+...
+LDFLAGS+= -L/usr/local/cuda/lib64 -lcuda -lcudart -lcublas -lcurand
+\end{lstlisting}}
+改为支持CUDA的编译选项
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=make]
+GPU=1
+...
+OPENCV=1
+...
+ARCH=  -gencode arch=compute_20,code=compute_20
+...
+LDFLAGS+= -L/usr/local/cuda/lib -lcuda -lcudart -lcublas -lcurand
+\end{lstlisting}}
+
+\section{测试安装结果}
+测试一下GPU的支持以及OpenCV的支持
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+# Test OpenCV
+./darknet imtest data/eagle.jpg
+# Test GPU
+wget http://pjreddie.com/media/files/yolo.weights
+./darknet -i 0 detect cfg/yolo.cfg yolo.weights data/dog.jpg
+\end{lstlisting}}
+
+如下图可以认为Draknet也安装成功。
+
+\begin{figure*}[h]
+    \centering
+        \begin{subfigure}[h!]{0.5\textwidth}
+            \centering
+            \includegraphics[height=1.8in]{13.png}
+            \caption{Darknet OpenCV测试}
+        \end{subfigure}%
+        ~
+        \begin{subfigure}[h!]{0.5\textwidth}
+            \centering
+            \includegraphics[height=1.8in]{14.png}
+            \caption{Darknet GPU测试}
+        \end{subfigure}
+        \caption{Darknet运行结果截图}
+\end{figure*}
 
 \end{document}
