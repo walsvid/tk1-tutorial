@@ -9,6 +9,7 @@
 \usepackage[mathscr]{eucal}
 \usepackage{pythonhighlight}
 \usepackage{fancyhdr}
+\usepackage{bbm}
 \usepackage{textcomp}
 \usepackage[top=1in,bottom=1in, left=1in, right=1in]{geometry}
 \usepackage[hidelinks]{hyperref}
@@ -506,6 +507,37 @@ $$Pr(Class_i|Object)*Pr(Object)*IOU^{truth}_{predict}=Pr(Class_i)*IOU^{truth}_{p
 等式左边第一项就是每个网格预测的类别信息，第二三项就是每个bounding box预测的confidence。这个乘积即encode了预测的box属于某一类的概率，也有该box准确度的信息。
 
 得到每个box的class-specific confidence score以后，设置阈值，滤掉得分低的boxes，对保留的boxes进行NMS处理，就得到最终的检测结果。
+\subsubsection{损失函数的设计}
+在实现中，最主要的就是怎么设计损失函数，让这个三个方面得到很好的平衡。作者简单粗暴的全部采用了sum-squared error loss来做这件事。
+
+这种做法存在以下几个问题：
+\begin{enumerate}
+  \item 8维的localization error和20维的classification error同等重要显然是不合理的；
+  \item 如果一个网格中没有object（一幅图中这种网格很多），那么就会将这些网格中的box的confidence push到0，相比于较少的有object的网格，这种做法是overpowering的，这会导致网络不稳定甚至发散。
+\end{enumerate}
+解决办法：
+
+更重视8维的坐标预测，给这些损失前面赋予更大的loss weight, 记为在pascal VOC训练中取5。
+对没有object的box的confidence loss，赋予小的loss weight，记为在pascal VOC训练中取0.5。
+有object的box的confidence loss和类别的loss的loss weight正常取1。
+对不同大小的box预测中，相比于大box预测偏一点，小box预测偏一点肯定更不能被忍受的。而sum-square error loss中对同样的偏移loss是一样。
+为了缓和这个问题，作者用了一个比较取巧的办法，就是将box的width和height取平方根代替原本的height和width。
+
+最后的损失函数：
+\begin{multline}
+  \lambda_{coord}\sum_{i=0}^{S^2}\sum_{j=0}^{B}\mathbbm{1}^{obj}_{ij}[(x_i-\hat{x_i})^{2}+(y_i-\hat{y_i})^{2}]\\
+  +\lambda_{coord}\sum_{i=0}^{S^2}\sum_{j=0}^{B}\mathbbm{1}^{obj}_{ij}[(\sqrt{w_i}-\sqrt{\hat{w_i}})^{2}\\
+  +(\sqrt{h_i}-\sqrt{\hat{h_i}})^{2}]+\sum_{i=0}^{S^2}\sum_{j=0}^{B}\mathbbm{1}^{obj}_{ij}(C_i-\hat{C_i})^{2}\\
+  +\lambda_{noobj}\sum_{i=0}^{S^2}\sum_{j=0}^{B}\mathbbm{1}^{noobj}_{ij}(C_i-\hat{C_i})^{2}+\sum_{i=0}^{S^2}\mathbbm{1}^{obj}_{i}\sum_{c \in classes}(p_i(c)-\hat{p_i}(c))^2
+  \nonumber
+\end{multline}
+\subsubsection{模型缺点}
+\begin{enumerate}
+  \item YOLO对相互靠的很近的物体，还有很小的群体 检测效果不好，这是因为一个网格中只预测了两个框，并且只属于一类。
+  \item 对测试图像中，同一类物体出现的新的不常见的长宽比和其他情况是。泛化能力偏弱。
+  \item 由于损失函数的问题，定位误差是影响检测效果的主要原因。尤其是大小物体的处理上，还有待加强。
+\end{enumerate}
+
 \subsubsection{网络结构}
 下面是YOLO算法使用的网络模型的结构：
 \begin{figure}[h]
@@ -548,6 +580,7 @@ layer     filters    size              input                output
    29 conv    425  1 x 1 / 1    13 x  13 x1024   ->    13 x  13 x 425
    30 detection
 \end{lstlisting}}
+
 \subsection{可选的tiny-yolo模型}
 由于YOLO模型相对于tk1的计算能力来说还是比较庞大，所以可以选用更小但是速度更快的tiny-YOLO来实现video级别的物体检测。
 当然这样做的代价是牺牲了准确度。
