@@ -1,4 +1,5 @@
 # Temporary files
+auto/*
 *.jpg
 *.png
 *.pdf
