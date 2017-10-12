@@ -485,9 +485,34 @@ void run_yolo(int argc, char **argv)
 \subsection{yolo模型介绍}
 % 这里简单介绍YOLO
 \subsubsection{模型思想}
-待完成
+YOLO的核心思想就是利用整张图作为网络的输入，直接在输出层回归bounding box的位置和bounding box所属的类别。
+
+faster RCNN中也直接用整张图作为输入，但是faster-RCNN整体还是采用了RCNN那种 proposal+classifier的思想，只不过是将提取proposal的步骤放在CNN中实现了。
+
+具体采用的实现方法：
+将一幅图像分成SxS个网格(grid cell)，如果某个object的中心 落在这个网格中，则这个网格就负责预测这个object。
+每个网格要预测B个bounding box，每个bounding box除了要回归自身的位置之外，还要附带预测一个confidence值。
+这个confidence代表了所预测的box中含有object的置信度和这个box预测的有多准两重信息，其值是这样计算的：
+$$Pr(Object)*IOU^{truth}_{predict}$$
+其中如果有object落在一个grid cell里，第一项取1，否则取0。 第二项是预测的bounding box和实际的groundtruth之间的IoU值。
+
+每个bounding box要预测(x, y, w, h)和confidence共5个值，每个网格还要预测一个类别信息，记为C类。则SxS个网格，每个网格要预测B个bounding box还要预测C个categories。输出就是S x S x (5*B+C)的一个tensor。
+注意：class信息是针对每个网格的，confidence信息是针对每个bounding box的。
+
+在PASCAL VOC数据集中，图像输入为448x448，取S=7，B=2，一共有20个类别(C=20)。则输出就是7x7x30的一个tensor。
+
+在test的时候，每个网格预测的class信息和bounding box预测的confidence信息相乘，就得到每个bounding box的class-specific confidence score:
+$$Pr(Class_i|Object)*Pr(Object)*IOU^{truth}_{predict}=Pr(Class_i)*IOU^{truth}_{predict}$$
+等式左边第一项就是每个网格预测的类别信息，第二三项就是每个bounding box预测的confidence。这个乘积即encode了预测的box属于某一类的概率，也有该box准确度的信息。
+
+得到每个box的class-specific confidence score以后，设置阈值，滤掉得分低的boxes，对保留的boxes进行NMS处理，就得到最终的检测结果。
 \subsubsection{网络结构}
 下面是YOLO算法使用的网络模型的结构：
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=5.5in]{15.png}
+  \caption{YOLO的网络结构模型}
+\end{figure}
 {\setmainfont{Courier New Bold}                          % 设置代码字体
 \begin{lstlisting}[language=bash]
 layer     filters    size              input                output
@@ -535,6 +560,10 @@ layer     filters    size              input                output
 ./darknet detector test cfg/coco.data cfg/yolo.cfg yolo.weights <image path>
 \end{lstlisting}}
 \subsection{Video object detection}
+对于视频，实时进行object detection，需要调用的是
+\info{demo}
+函数。需要传入待分析的视频文件或者camera的number。
+
 tk1并不自带摄像头，好在可以使用USB摄像头，无需任何驱动，直接可用。传入的num是0。
 {\setmainfont{Courier New Bold}                          % 设置代码字体
 \begin{lstlisting}[language=bash]
