@@ -607,9 +607,201 @@ tk1并不自带摄像头，好在可以使用USB摄像头，无需任何驱动�
 \begin{lstlisting}[language=bash]
 ./darknet detector demo cfg/coco.data cfg/yolo.cfg yolo.weights <video file>
 \end{lstlisting}}
-\section{基于OpenCV和HOG的行人检测}
+\section{基于OpenCV和HOG特征的行人检测}
+\subsection{HOG检测原理}
+HOG特征描述子（HOG descriptors）是由Navneet Dalal和 Bill Triggs在2005年的一篇介绍行人检测方法的论文提到的特征描述子。
+
+HOG属于特征提取，它统计梯度直方图特征。具体来说就是将梯度方向（0->360°）划分为9个区间，将图像化为16x16的若干个block,每个block在化为4个cell（8x8）。对每一个cell,算出每一点的梯度方向和模，按梯度方向增加对应bin的值，最终综合N个cell的梯度直方图形成一个高维描述子向量。实际实现的时候会有各种插值。
+选用的分类器是经典的SVM。检测框架为经典的滑动窗口法，即在位置空间和尺度空间遍历搜索检测。
+\subsection{HOG检测代码}
+利用安装好的OpenCV2，我们调用其中的api，写一个用于行人图片检测程序。
+从命令行读入图片的路径，使用HOG来进行特征检测，最后输出行人位置的bounding box。
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=python]
+from __future__ import print_function
+
+import numpy as np
+import cv2
+
+
+def inside(r, q):
+    rx, ry, rw, rh = r
+    qx, qy, qw, qh = q
+    return rx > qx and ry > qy and rx + rw < qx + qw and ry + rh < qy + qh
+
+
+def draw_detections(img, rects, thickness = 1):
+    for x, y, w, h in rects:
+        # the HOG detector returns slightly larger rectangles
+        # than the real objects.
+        # so we slightly shrink the rectangles to get a nicer output.
+        pad_w, pad_h = int(0.15*w), int(0.05*h)
+        cv2.rectangle(img, (x+pad_w, y+pad_h),
+                    (x+w-pad_w, y+h-pad_h), (0, 255, 0), thickness)
+
+
+if __name__ == '__main__':
+    import sys
+    from glob import glob
+    import itertools as it
+
+    print(__doc__)
+
+    hog = cv2.HOGDescriptor()
+    hog.setSVMDetector( cv2.HOGDescriptor_getDefaultPeopleDetector() )
+
+    default = ['./data/1.jpg '] if len(sys.argv[1:]) == 0 else []
+
+    for fn in it.chain(*map(glob, default + sys.argv[1:])):
+        print(fn, ' - ',)
+        try:
+            img = cv2.imread(fn)
+            if img is None:
+                print('Failed to load image file:', fn)
+                continue
+        except:
+            print('loading error')
+            continue
+
+        found, w = hog.detectMultiScale(img, winStride=(8,8),
+                      padding=(32,32), scale=1.05)
+        found_filtered = []
+        for ri, r in enumerate(found):
+            for qi, q in enumerate(found):
+                if ri != qi and inside(r, q):
+                    break
+            else:
+                found_filtered.append(r)
+        draw_detections(img, found)
+        draw_detections(img, found_filtered, 3)
+        print('%d (%d) found' % (len(found_filtered), len(found)))
+        cv2.imshow('img', img)
+        ch = cv2.waitKey()
+        if ch == 27:
+            break
+    cv2.destroyAllWindows()
+\end{lstlisting}}
+\subsection{行人检测的运行于结果评测}
+\begin{figure*}[h]
+    \centering
+        \begin{subfigure}[h!]{0.5\textwidth}
+            \centering
+            \includegraphics[height=2in]{16.png}
+            \caption{测试图1}
+        \end{subfigure}%
+        ~
+        \begin{subfigure}[h!]{0.5\textwidth}
+            \centering
+            \includegraphics[height=2in]{17.png}
+            \caption{测试图2}
+        \end{subfigure}
+        \caption{OpenCV行人检测运行结果截图}
+\end{figure*}
+通过上述的图片的测试结果，在tk1上运行的基于HOG特征利用OpenCV框架的行人检测的效果较好，能够对图片中的行人进行检测。
+但是也应当看出如果是背影的行人的检测效果不佳，对于过大或者过小的目标的检测效果也有待提高。
+对于HOG这种基于图像特征提取的shallow模型来说达到这种效果已经是比较令人满意了。
+由于OpenCV封装的HOG特征提取的效率较高，在tk1这种嵌入式设备上也有较好的效果。
 \section{基于OpenCV的 face detection}
+OpenCV框架的人脸检测是基于Haar特征提取的。这里我们先暂时不分析Haar特征提取的原理，单纯看一下如何利用OpenCV进行人脸的检测。
+\subsection{人脸检测的代码}
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=python]
+#!/usr/bin/python
 
+import sys
+import cv2.cv as cv
+from optparse import OptionParser
 
+min_size = (20, 20)
+image_scale = 2
+haar_scale = 1.2
+min_neighbors = 2
+haar_flags = 0
 
+def detect_and_draw(img, cascade):
+    # allocate temporary images
+    gray = cv.CreateImage((img.width,img.height), 8, 1)
+    small_img = cv.CreateImage((cv.Round(img.width / image_scale),
+                   cv.Round (img.height / image_scale)), 8, 1)
+
+    # convert color input image to grayscale
+    cv.CvtColor(img, gray, cv.CV_BGR2GRAY)
+
+    # scale input image for faster processing
+    cv.Resize(gray, small_img, cv.CV_INTER_LINEAR)
+
+    cv.EqualizeHist(small_img, small_img)
+
+    if(cascade):
+        t = cv.GetTickCount()
+        faces = cv.HaarDetectObjects(small_img, cascade, cv.CreateMemStorage(0),
+                                     haar_scale, min_neighbors, haar_flags, min_size)
+        t = cv.GetTickCount() - t
+        print "detection time = %gms" % (t/(cv.GetTickFrequency()*1000.))
+        if faces:
+            for ((x, y, w, h), n) in faces:
+                # the input to cv.HaarDetectObjects was resized, so scale the
+                # bounding box of each face and convert it to two CvPoints
+                pt1 = (int(x * image_scale), int(y * image_scale))
+                pt2 = (int((x + w) * image_scale), int((y + h) * image_scale))
+                cv.Rectangle(img, pt1, pt2, cv.RGB(255, 0, 0), 3, 8, 0)
+
+    cv.ShowImage("result", img)
+
+if __name__ == '__main__':
+
+    parser = OptionParser(usage = "usage: %prog [options] \
+              [filename|camera_index]")
+    parser.add_option("-c", "--cascade", action="store", dest="cascade",
+                    type="str", help="Haar cascade file, default %default",
+                    default = "../data/haarcascades/haarcascade_frontalface_alt.xml")
+    (options, args) = parser.parse_args()
+
+    cascade = cv.Load(options.cascade)
+
+    if len(args) != 1:
+        parser.print_help()
+        sys.exit(1)
+
+    input_name = args[0]
+    if input_name.isdigit():
+        capture = cv.CreateCameraCapture(int(input_name))
+    else:
+        capture = None
+
+    cv.NamedWindow("result", 1)
+
+    if capture:
+        frame_copy = None
+        while True:
+            frame = cv.QueryFrame(capture)
+            if not frame:
+                cv.WaitKey(0)
+                break
+            if not frame_copy:
+                frame_copy = cv.CreateImage((frame.width,frame.height),
+                                            cv.IPL_DEPTH_8U, frame.nChannels)
+            if frame.origin == cv.IPL_ORIGIN_TL:
+                cv.Copy(frame, frame_copy)
+            else:
+                cv.Flip(frame, frame_copy, 0)
+
+            detect_and_draw(frame_copy, cascade)
+
+            if cv.WaitKey(10) >= 0:
+                break
+    else:
+        image = cv.LoadImage(input_name, 1)
+        detect_and_draw(image, cascade)
+        cv.WaitKey(0)
+
+    cv.DestroyWindow("result")
+\end{lstlisting}}
+\subsection{人脸检测的结果}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=5.5in]{18.png}
+  \caption{基于Haar特征的人脸检测}
+\end{figure}
+检测的结果还是比较好的，但是基于Haar的特征提取器对于较小和角度不太好的人脸的检测效果一般，有待提升。
 \end{document}
