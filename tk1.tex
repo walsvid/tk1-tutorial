@@ -445,4 +445,109 @@ wget http://pjreddie.com/media/files/yolo.weights
         \caption{Darknet运行结果截图}
 \end{figure*}
 
+\chapter{NVIDIA tk1 实际工程项目实践}
+\section{使用YOLO并结合摄像头实现image/video object detection}
+YOLO算法使用的darknet模型框架只依赖CUDA，可以直接在tk1上运行。
+对于网络权重的训练部分在服务器端进行，tk1上直接进行测试。
+对于源码分析一下：
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=c]
+void run_yolo(int argc, char **argv)
+{
+    char *prefix = find_char_arg(argc, argv, "-prefix", 0);
+    float thresh = find_float_arg(argc, argv, "-thresh", .2);
+    int cam_index = find_int_arg(argc, argv, "-c", 0);
+    int frame_skip = find_int_arg(argc, argv, "-s", 0);
+    if(argc < 4){
+        fprintf(stderr, "usage: %s %s [train/test/valid] \
+        [cfg] [weights (optional)]\n", argv[0], argv[1]);
+        return;
+    }
+
+    char *cfg = argv[3];
+    char *weights = (argc > 4) ? argv[4] : 0;
+    char *filename = (argc > 5) ? argv[5]: 0;
+    if(0==strcmp(argv[2], "test"))
+        test_yolo(cfg, weights, filename, thresh);
+    else if(0==strcmp(argv[2], "train"))
+        train_yolo(cfg, weights);
+    else if(0==strcmp(argv[2], "valid"))
+        validate_yolo(cfg, weights);
+    else if(0==strcmp(argv[2], "recall"))
+        validate_yolo_recall(cfg, weights);
+    else if(0==strcmp(argv[2], "demo"))
+        demo(cfg, weights, thresh, cam_index, \
+          filename, voc_names, 20, frame_skip, prefix);
+}
+\end{lstlisting}}
+通过分析上面的代码，在运行YOLO的时候，如果是图片，就应该选择test作为参数；
+如果是视频的格式，就选择demo作为视频的参数，并且要注意传入摄像头的编号。
+\subsection{yolo模型介绍}
+% 这里简单介绍YOLO
+\subsubsection{模型思想}
+待完成
+\subsubsection{网络结构}
+下面是YOLO算法使用的网络模型的结构：
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+layer     filters    size              input                output
+    0 conv     32  3 x 3 / 1   416 x 416 x   3   ->   416 x 416 x  32
+    1 max          2 x 2 / 2   416 x 416 x  32   ->   208 x 208 x  32
+    2 conv     64  3 x 3 / 1   208 x 208 x  32   ->   208 x 208 x  64
+    3 max          2 x 2 / 2   208 x 208 x  64   ->   104 x 104 x  64
+    4 conv    128  3 x 3 / 1   104 x 104 x  64   ->   104 x 104 x 128
+    5 conv     64  1 x 1 / 1   104 x 104 x 128   ->   104 x 104 x  64
+    6 conv    128  3 x 3 / 1   104 x 104 x  64   ->   104 x 104 x 128
+    7 max          2 x 2 / 2   104 x 104 x 128   ->    52 x  52 x 128
+    8 conv    256  3 x 3 / 1    52 x  52 x 128   ->    52 x  52 x 256
+    9 conv    128  1 x 1 / 1    52 x  52 x 256   ->    52 x  52 x 128
+   10 conv    256  3 x 3 / 1    52 x  52 x 128   ->    52 x  52 x 256
+   11 max          2 x 2 / 2    52 x  52 x 256   ->    26 x  26 x 256
+   12 conv    512  3 x 3 / 1    26 x  26 x 256   ->    26 x  26 x 512
+   13 conv    256  1 x 1 / 1    26 x  26 x 512   ->    26 x  26 x 256
+   14 conv    512  3 x 3 / 1    26 x  26 x 256   ->    26 x  26 x 512
+   15 conv    256  1 x 1 / 1    26 x  26 x 512   ->    26 x  26 x 256
+   16 conv    512  3 x 3 / 1    26 x  26 x 256   ->    26 x  26 x 512
+   17 max          2 x 2 / 2    26 x  26 x 512   ->    13 x  13 x 512
+   18 conv   1024  3 x 3 / 1    13 x  13 x 512   ->    13 x  13 x1024
+   19 conv    512  1 x 1 / 1    13 x  13 x1024   ->    13 x  13 x 512
+   20 conv   1024  3 x 3 / 1    13 x  13 x 512   ->    13 x  13 x1024
+   21 conv    512  1 x 1 / 1    13 x  13 x1024   ->    13 x  13 x 512
+   22 conv   1024  3 x 3 / 1    13 x  13 x 512   ->    13 x  13 x1024
+   23 conv   1024  3 x 3 / 1    13 x  13 x1024   ->    13 x  13 x1024
+   24 conv   1024  3 x 3 / 1    13 x  13 x1024   ->    13 x  13 x1024
+   25 route  16
+   26 reorg              / 2    26 x  26 x 512   ->    13 x  13 x2048
+   27 route  26 24
+   28 conv   1024  3 x 3 / 1    13 x  13 x3072   ->    13 x  13 x1024
+   29 conv    425  1 x 1 / 1    13 x  13 x1024   ->    13 x  13 x 425
+   30 detection
+\end{lstlisting}}
+\subsection{可选的tiny-yolo模型}
+由于YOLO模型相对于tk1的计算能力来说还是比较庞大，所以可以选用更小但是速度更快的tiny-YOLO来实现video级别的物体检测。
+当然这样做的代价是牺牲了准确度。
+% 这里展示tiny yolo
+\subsection{Image object detection}
+对于图片，参数选择是test，调用\info{test\_yolo}
+函数。对于图片测试，只需要运行下面的命令即可。
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+./darknet detector test cfg/coco.data cfg/yolo.cfg yolo.weights <image path>
+\end{lstlisting}}
+\subsection{Video object detection}
+tk1并不自带摄像头，好在可以使用USB摄像头，无需任何驱动，直接可用。传入的num是0。
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+./darknet detector demo cfg/coco.data cfg/yolo.cfg yolo.weights -c <num>
+\end{lstlisting}}
+或者可以传入一个视频文件，YOLO会将object detection的结果实时输出。
+{\setmainfont{Courier New Bold}                          % 设置代码字体
+\begin{lstlisting}[language=bash]
+./darknet detector demo cfg/coco.data cfg/yolo.cfg yolo.weights <video file>
+\end{lstlisting}}
+\section{基于OpenCV和HOG的行人检测}
+\section{基于OpenCV的 face detection}
+
+
+
 \end{document}
